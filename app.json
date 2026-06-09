@@ -23,7 +23,8 @@
     },
     "plugins": [
       "@dittolive/ditto",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-build-properties"
     ]
   }
 }
