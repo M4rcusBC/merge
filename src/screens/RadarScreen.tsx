@@ -65,7 +65,12 @@ export const RadarScreen = () => {
   const renderMessage = ({ item }: { item: MessageDocument }) => (
     <View style={styles.messageRow}>
       <Text style={styles.messageText}>{item.text}</Text>
-      <Text style={styles.messageMeta}>{new Date(item.timestamp).toLocaleTimeString()} • {item.senderId}</Text>
+      <Text
+        style={styles.messageMeta}
+        accessibilityLabel={`Message sent at ${new Date(item.timestamp).toLocaleTimeString()} by ${item.senderId}`}
+      >
+        {new Date(item.timestamp).toLocaleTimeString()} • {item.senderId}
+      </Text>
     </View>
   );
 

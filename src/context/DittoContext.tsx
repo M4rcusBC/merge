@@ -4,11 +4,19 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
 export type DittoIdentity = 'onlinePlayground' | 'development';
 
-const ONLINE_PLAYGROUND_APP_ID = '00000000-0000-0000-0000-000000000000';
-const ONLINE_PLAYGROUND_TOKEN = 'REPLACE_WITH_ONLINE_PLAYGROUND_TOKEN';
-const DEVELOPMENT_APP_ID = '11111111-1111-1111-1111-111111111111';
-const DEVELOPMENT_TOKEN = 'REPLACE_WITH_DEVELOPMENT_TOKEN';
+const DITTO_IDENTITY_CONFIG: Record<DittoIdentity, { appId: string; token: string }> = {
+  onlinePlayground: {
+    appId: process.env.EXPO_PUBLIC_DITTO_ONLINE_PLAYGROUND_APP_ID ?? '',
+    token: process.env.EXPO_PUBLIC_DITTO_ONLINE_PLAYGROUND_TOKEN ?? '',
+  },
+  development: {
+    appId: process.env.EXPO_PUBLIC_DITTO_DEVELOPMENT_APP_ID ?? '',
+    token: process.env.EXPO_PUBLIC_DITTO_DEVELOPMENT_TOKEN ?? '',
+  },
+};
 const ONLINE_PLAYGROUND_URL = 'https://playground.ditto.live';
+const ONLINE_PLAYGROUND_AUTH_PROVIDER = process.env.EXPO_PUBLIC_DITTO_ONLINE_PLAYGROUND_AUTH_PROVIDER ?? String(Authenticator.DEVELOPMENT_PROVIDER);
+const PRESENCE_HEARTBEAT_MS = Number(process.env.EXPO_PUBLIC_PRESENCE_HEARTBEAT_MS ?? '30000');
 const LOCAL_PEER_ID_KEY = 'merge.localPeerId';
 
 export type PeerDocument = {
@@ -148,7 +156,12 @@ export const initDitto = (identity: DittoIdentity = 'development'): Promise<Ditt
     await init();
 
     const localId = await loadOrCreateLocalId();
-    const appId = identity === 'onlinePlayground' ? ONLINE_PLAYGROUND_APP_ID : DEVELOPMENT_APP_ID;
+    const identityConfig = DITTO_IDENTITY_CONFIG[identity];
+    const appId = identityConfig.appId;
+
+    if (!appId) {
+      throw new Error(`Missing Ditto appId for identity: ${identity}`);
+    }
 
     const config = new DittoConfig(
       appId,
@@ -164,15 +177,16 @@ export const initDitto = (identity: DittoIdentity = 'development'): Promise<Ditt
     });
 
     if (identity === 'onlinePlayground') {
+      if (!identityConfig.token) {
+        throw new Error('Missing Ditto online playground token');
+      }
+
       await raw.auth.setExpirationHandler(async (ditto) => {
-        await ditto.auth.login(ONLINE_PLAYGROUND_TOKEN, Authenticator.DEVELOPMENT_PROVIDER);
+        await ditto.auth.login(identityConfig.token, ONLINE_PLAYGROUND_AUTH_PROVIDER);
       });
-    } else {
-      void DEVELOPMENT_TOKEN;
     }
 
     const store = createStoreAdapter(raw, localId);
-    store.collection<PeerDocument>('peers');
 
     return {
       raw,
@@ -240,7 +254,7 @@ export const DittoProvider = ({ children }: { children: React.ReactNode }) => {
     void upsertSelf();
     const heartbeat = setInterval(() => {
       void upsertSelf();
-    }, 15_000);
+    }, PRESENCE_HEARTBEAT_MS);
 
     return () => {
       clearInterval(heartbeat);
